@@ -1,0 +1,345 @@
+{
+  "info": {
+    "name": "Decentro Expense Sharing Service API",
+    "description": "Comprehensive Postman collection for the Decentro SDE Intern Assignment - Expense Sharing Service.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000"
+    },
+    {
+      "key": "group_id",
+      "value": "1"
+    },
+    {
+      "key": "user_id_1",
+      "value": "1"
+    },
+    {
+      "key": "user_id_2",
+      "value": "2"
+    },
+    {
+      "key": "user_id_3",
+      "value": "3"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Quick Demo Seeder",
+      "item": [
+        {
+          "name": "Seed Goa Trip Demo Data",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/demo/seed",
+              "host": ["{{base_url}}"],
+              "path": ["api", "demo", "seed"]
+            },
+            "description": "Seeds Mohit, Rahul, Ankit, Goa Trip group, and benchmark ₹1200 Dinner expense."
+          }
+        },
+        {
+          "name": "Reset Database",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/demo/reset",
+              "host": ["{{base_url}}"],
+              "path": ["api", "demo", "reset"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Part 1 — User Management",
+      "item": [
+        {
+          "name": "Create User (Mohit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Mohit\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["users"]
+            }
+          }
+        },
+        {
+          "name": "Create User (Rahul)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rahul\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["users"]
+            }
+          }
+        },
+        {
+          "name": "Create User (Ankit)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ankit\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["users"]
+            }
+          }
+        },
+        {
+          "name": "List Users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/users",
+              "host": ["{{base_url}}"],
+              "path": ["users"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Part 2 — Group Management",
+      "item": [
+        {
+          "name": "Create Group (Goa Trip)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Goa Trip\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/groups",
+              "host": ["{{base_url}}"],
+              "path": ["groups"]
+            }
+          }
+        },
+        {
+          "name": "Add Rahul to Group",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group_id\": 1,\n  \"user_id\": 2\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/groups/1/members",
+              "host": ["{{base_url}}"],
+              "path": ["groups", "1", "members"]
+            }
+          }
+        },
+        {
+          "name": "List Group Members",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/groups/1/members",
+              "host": ["{{base_url}}"],
+              "path": ["groups", "1", "members"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Part 3 — Expense Management",
+      "item": [
+        {
+          "name": "Add Expense (Dinner = 1200)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group_id\": 1,\n  \"paid_by\": 1,\n  \"amount\": 1200,\n  \"description\": \"Dinner\",\n  \"category\": \"Food\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/expenses",
+              "host": ["{{base_url}}"],
+              "path": ["expenses"]
+            }
+          }
+        },
+        {
+          "name": "Add Expense (Custom Unequal Splits)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group_id\": 1,\n  \"paid_by\": 1,\n  \"amount\": 1000,\n  \"description\": \"Buffet Lunch\",\n  \"split_type\": \"EXACT\",\n  \"splits\": [\n    { \"user_id\": 1, \"amount\": 500 },\n    { \"user_id\": 2, \"amount\": 300 },\n    { \"user_id\": 3, \"amount\": 200 }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/expenses",
+              "host": ["{{base_url}}"],
+              "path": ["expenses"]
+            }
+          }
+        },
+        {
+          "name": "List Group Expenses",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/groups/1/expenses",
+              "host": ["{{base_url}}"],
+              "path": ["groups", "1", "expenses"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Part 4 — Balance Calculation",
+      "item": [
+        {
+          "name": "Get Balances (Required Format)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/balances",
+              "host": ["{{base_url}}"],
+              "path": ["balances"]
+            },
+            "description": "Returns exact structured format from page 8 of assignment."
+          }
+        },
+        {
+          "name": "Get Detailed Group Balances",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/groups/1/balances",
+              "host": ["{{base_url}}"],
+              "path": ["groups", "1", "balances"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Bonus & Enhancements",
+      "item": [
+        {
+          "name": "Settle Balance (Rahul pays Mohit 400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"group_id\": 1,\n  \"payer_id\": 2,\n  \"payee_id\": 1,\n  \"amount\": 400,\n  \"notes\": \"Settling dinner expense\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/settlements",
+              "host": ["{{base_url}}"],
+              "path": ["settlements"]
+            }
+          }
+        },
+        {
+          "name": "Get Group Spending Analytics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/groups/1/analytics",
+              "host": ["{{base_url}}"],
+              "path": ["groups", "1", "analytics"]
+            }
+          }
+        },
+        {
+          "name": "Export Group Report (CSV)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/groups/1/export?format=csv",
+              "host": ["{{base_url}}"],
+              "path": ["groups", "1", "export"],
+              "query": [
+                {
+                  "key": "format",
+                  "value": "csv"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

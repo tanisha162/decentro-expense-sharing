@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: decentro_expense_sharing
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./expense_sharing.db
+      - DEBUG=True
+    volumes:
+      - ./expense_sharing.db:/app/expense_sharing.db
+    restart: unless-stopped
