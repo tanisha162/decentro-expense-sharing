@@ -66,6 +66,35 @@ def test_add_expense_validation_amount_negative(client):
     })
     assert res.status_code == 422
 
+def test_add_expense_invalid_split_type_rejected(client):
+    """Unknown split_type must be rejected, not stored while splits are
+    silently computed as EQUAL (regression: 'PERCENTAGE' returned 201)."""
+    g_id, u1, _, _ = setup_group_with_users(client)
+    res = client.post("/expenses", json={
+        "group_id": g_id,
+        "paid_by": u1,
+        "amount": 900.0,
+        "description": "Bogus split type",
+        "split_type": "PERCENTAGE"
+    })
+    assert res.status_code == 422
+    # Nothing was stored for the rejected expense
+    assert client.get(f"/groups/{g_id}/expenses").json() == []
+
+def test_add_expense_split_type_case_normalized(client):
+    """Lowercase split_type is accepted but stored canonical uppercase."""
+    g_id, u1, _, _ = setup_group_with_users(client)
+    res = client.post("/expenses", json={
+        "group_id": g_id,
+        "paid_by": u1,
+        "amount": 900.0,
+        "description": "Lowercase equal",
+        "split_type": "equal"
+    })
+    assert res.status_code == 201
+    assert res.json()["split_type"] == "EQUAL"
+    assert len(res.json()["splits"]) == 3
+
 def test_add_expense_validation_non_member_payer(client):
     g_id, _, _, _ = setup_group_with_users(client)
     outsider_id = client.post("/users", json={"name": "Outsider"}).json()["id"]

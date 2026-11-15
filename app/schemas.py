@@ -82,6 +82,19 @@ class ExpenseCreate(BaseModel):
             raise ValueError("Expense description cannot be empty")
         return clean
 
+    @field_validator("split_type")
+    @classmethod
+    def split_type_must_be_known(cls, v: Optional[str]) -> str:
+        # Normalize case ("equal" -> "EQUAL") and reject unknown values:
+        # an unknown split_type was silently stored while splits were
+        # computed as EQUAL, so the stored type lied about the split.
+        if v is None:
+            return "EQUAL"
+        clean = v.strip().upper()
+        if clean not in ("EQUAL", "EXACT"):
+            raise ValueError("split_type must be 'EQUAL' or 'EXACT'")
+        return clean
+
     @model_validator(mode="after")
     def validate_splits(self):
         if self.split_type == "EXACT":
