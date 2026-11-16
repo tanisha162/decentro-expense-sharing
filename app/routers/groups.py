@@ -63,6 +63,13 @@ def add_user_to_group(group_id: int, member_in: AddMemberRequest, db: Session = 
     { "group_id": 1, "user_id": 2 } or { "user_id": 2 }
     """
     target_group_id = member_in.group_id or group_id
+    if member_in.group_id is not None and member_in.group_id != group_id:
+        # The path group is authoritative: a conflicting body group_id
+        # used to silently add the user to the *other* group instead.
+        raise HTTPException(
+            status_code=400,
+            detail=f"group_id in request body ({member_in.group_id}) does not match path group_id ({group_id})"
+        )
     member = group_service.add_user_to_group(db, target_group_id, member_in.user_id)
     return {
         "message": f"User {member.user.name} added to group {member.group.name}",

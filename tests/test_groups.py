@@ -37,3 +37,25 @@ def test_add_nonexistent_user_to_group(client):
 
     res = client.post(f"/groups/{g_id}/members", json={"user_id": 9999})
     assert res.status_code == 404
+
+def test_add_member_conflicting_body_group_id_rejected(client):
+    """A body group_id that disagrees with the path group_id must be
+    rejected, not silently add the user to the other group (regression:
+    POST /groups/1/members with {"group_id": 2, ...} added the user to
+    group 2 while the URL said group 1)."""
+    g1 = client.post("/groups", json={"name": "Goa Trip"}).json()["id"]
+    g2 = client.post("/groups", json={"name": "Other Trip"}).json()["id"]
+    u1 = client.post("/users", json={"name": "Mohit"}).json()["id"]
+
+    res = client.post(f"/groups/{g1}/members", json={"group_id": g2, "user_id": u1})
+    assert res.status_code == 400
+    assert "does not match" in res.json()["detail"]
+
+    # The user must not have landed in either group
+    assert client.get(f"/groups/{g1}/members").json() == []
+    assert client.get(f"/groups/{g2}/members").json() == []
+
+    # A matching body group_id still works
+    res_ok = client.post(f"/groups/{g1}/members", json={"group_id": g1, "user_id": u1})
+    assert res_ok.status_code == 200
+    assert [m["name"] for m in client.get(f"/groups/{g1}/members").json()] == ["Mohit"]
