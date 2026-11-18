@@ -111,22 +111,25 @@ def calculate_pairwise_balances_for_group(
 
             if diff > 0.005:
                 # u1 owes u2
+                # Aggregate by display name: several members can share a
+                # name, and overwriting here silently dropped all but one
+                # of their debts (two "Rahul"s each owing 300 showed as 300).
                 amount = round(diff, 2)
-                if u1_name not in pairwise_balances:
-                    pairwise_balances[u1_name] = {"owes": {}}
-                pairwise_balances[u1_name]["owes"][u2_name] = amount
+                owes = pairwise_balances.setdefault(u1_name, {"owes": {}})["owes"]
+                owes[u2_name] = round(owes.get(u2_name, 0.0) + amount, 2)
             elif diff < -0.005:
                 # u2 owes u1
                 amount = round(-diff, 2)
-                if u2_name not in pairwise_balances:
-                    pairwise_balances[u2_name] = {"owes": {}}
-                pairwise_balances[u2_name]["owes"][u1_name] = amount
+                owes = pairwise_balances.setdefault(u2_name, {"owes": {}})["owes"]
+                owes[u1_name] = round(owes.get(u1_name, 0.0) + amount, 2)
 
     # 4. Formatted net balances (name -> net amount)
+    # Aggregate by display name: members can share a name, and assigning
+    # here used to keep only the last member's net, losing the others.
     formatted_net_balances: Dict[str, float] = {}
     for uid, net in net_balances_by_id.items():
         name = user_map[uid].name if uid in user_map else f"User {uid}"
-        formatted_net_balances[name] = round(net, 2)
+        formatted_net_balances[name] = round(formatted_net_balances.get(name, 0.0) + net, 2)
 
     # 5. Smart Debt Simplification Algorithm (Min-Cash-Flow)
     # Debtors: net < -0.005, Creditors: net > 0.005
