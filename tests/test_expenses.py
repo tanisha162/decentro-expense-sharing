@@ -82,6 +82,35 @@ def test_add_expense_exact_splits_rounding_balances(client):
     bals = client.get(f"/groups/{g_id}/balances").json()
     assert round(sum(bals["net_balances"].values()), 2) == 0.0
 
+def test_add_expense_equal_with_splits_rejected(client):
+    """Custom splits with split_type EQUAL must be rejected, not silently
+    discarded while the expense is stored as an equal split (regression:
+    splits [{Rahul: 90}] on a 100.00 EQUAL expense returned 201 with
+    33.34/33.33/33.33 equal splits). An empty splits list stays accepted."""
+    g_id, u1, u2, _ = setup_group_with_users(client)
+    res = client.post("/expenses", json={
+        "group_id": g_id,
+        "paid_by": u1,
+        "amount": 100.0,
+        "description": "Ignored splits",
+        "split_type": "EQUAL",
+        "splits": [{"user_id": u2, "amount": 90.0}],
+    })
+    assert res.status_code == 422
+    # Nothing was stored for the rejected expense
+    assert client.get(f"/groups/{g_id}/expenses").json() == []
+
+    res = client.post("/expenses", json={
+        "group_id": g_id,
+        "paid_by": u1,
+        "amount": 90.0,
+        "description": "Empty splits list",
+        "split_type": "EQUAL",
+        "splits": [],
+    })
+    assert res.status_code == 201
+    assert len(res.json()["splits"]) == 3
+
 def test_add_expense_validation_amount_negative(client):
     g_id, u1, _, _ = setup_group_with_users(client)
     res = client.post("/expenses", json={

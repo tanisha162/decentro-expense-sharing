@@ -105,6 +105,15 @@ class ExpenseCreate(BaseModel):
                 raise ValueError(
                     f"Sum of custom splits ({total_splits:.2f}) must equal the total expense amount ({self.amount:.2f})"
                 )
+        elif self.split_type == "EQUAL" and self.splits:
+            # A splits list with EQUAL was silently discarded while the
+            # expense was stored as an equal split, so the stored splits
+            # contradicted what the client asked for (e.g. Bina 90 of 100
+            # stored as 50/50). Reject it: custom splits need EXACT.
+            raise ValueError(
+                "Splits list must not be provided when split_type is EQUAL; "
+                "use split_type 'EXACT' for custom splits"
+            )
         return self
 
 
