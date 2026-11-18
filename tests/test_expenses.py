@@ -56,6 +56,32 @@ def test_add_expense_custom_unequal_splits(client):
     assert split_map["Rahul"] == 300.0
     assert split_map["Ankit"] == 200.0
 
+def test_add_expense_exact_splits_rounding_balances(client):
+    """Sub-cent EXACT splits must still sum to the expense amount: splits of
+    33.333 / 33.333 / 33.334 for a 100.00 expense used to be stored as
+    33.33 x 3 = 99.99, leaving a phantom cent in the net balances."""
+    g_id, u1, u2, u3 = setup_group_with_users(client)
+
+    res = client.post("/expenses", json={
+        "group_id": g_id,
+        "paid_by": u1,
+        "amount": 100.0,
+        "description": "Thirds",
+        "split_type": "EXACT",
+        "splits": [
+            {"user_id": u1, "amount": 33.333},
+            {"user_id": u2, "amount": 33.333},
+            {"user_id": u3, "amount": 33.334},
+        ],
+    })
+    assert res.status_code == 201
+    data = res.json()
+    assert round(sum(s["amount"] for s in data["splits"]), 2) == 100.0
+
+    # The ledger must balance: net balances sum to zero.
+    bals = client.get(f"/groups/{g_id}/balances").json()
+    assert round(sum(bals["net_balances"].values()), 2) == 0.0
+
 def test_add_expense_validation_amount_negative(client):
     g_id, u1, _, _ = setup_group_with_users(client)
     res = client.post("/expenses", json={

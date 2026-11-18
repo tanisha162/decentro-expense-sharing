@@ -72,6 +72,7 @@ def create_expense(db: Session, expense_in: ExpenseCreate) -> Expense:
         # Validate all split users are group members
         split_total = 0.0
         seen_users = set()
+        split_cents = []  # (user_id, whole cents) — computed before storing
         for item in expense_in.splits:
             if item.user_id in seen_users:
                 raise HTTPException(
@@ -87,20 +88,35 @@ def create_expense(db: Session, expense_in: ExpenseCreate) -> Expense:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"User '{u_name}' in splits is not a member of group '{group.name}'"
                 )
-            
-            splits_to_create.append(
-                ExpenseSplit(
-                    expense_id=expense.id,
-                    user_id=item.user_id,
-                    amount=round(item.amount, 2)
-                )
-            )
+
+            split_cents.append((item.user_id, int(round(item.amount * 100))))
             split_total += item.amount
 
         if abs(split_total - expense_in.amount) > 0.01:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Sum of custom splits ({split_total:.2f}) does not match expense amount ({expense_in.amount:.2f})"
+            )
+
+        # Rounding each split to whole cents can leave the stored total a
+        # cent short of the expense (e.g. 33.333 x 3 stored as 33.33 x 3 =
+        # 99.99 for a 100.00 expense), so the ledger no longer balanced:
+        # net balances summed to +0.01. Push the residual onto the largest
+        # split so the stored splits sum exactly to the expense amount.
+        total_cents = int(round(expense_in.amount * 100))
+        residual = total_cents - sum(c for _, c in split_cents)
+        if residual:
+            idx = max(range(len(split_cents)), key=lambda i: split_cents[i][1])
+            uid, cents = split_cents[idx]
+            split_cents[idx] = (uid, cents + residual)
+
+        for user_id, cents in split_cents:
+            splits_to_create.append(
+                ExpenseSplit(
+                    expense_id=expense.id,
+                    user_id=user_id,
+                    amount=cents / 100.0
+                )
             )
     else:
         # EQUAL split among all members of the group
