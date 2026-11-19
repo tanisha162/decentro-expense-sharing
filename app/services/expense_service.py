@@ -44,31 +44,22 @@ def create_expense(db: Session, expense_in: ExpenseCreate) -> Expense:
             detail=f"Payer '{payer.name}' (id: {expense_in.paid_by}) is not a member of group '{group.name}'"
         )
 
-    # 5. Create Expense record
+    # 5. Validate EXACT splits BEFORE creating the expense record.
     category = expense_in.category or "General"
     split_type = expense_in.split_type or "EQUAL"
 
-    expense = Expense(
-        group_id=expense_in.group_id,
-        paid_by=expense_in.paid_by,
-        amount=round(expense_in.amount, 2),
-        description=expense_in.description.strip(),
-        category=category,
-        split_type=split_type
-    )
-    db.add(expense)
-    db.flush()  # populate expense.id
-
-    # 6. Calculate splits
-    splits_to_create = []
-
+    # The validation used to run after the expense was added and flushed,
+    # so a rejected EXACT expense (duplicate user, non-member, bad sum)
+    # left a flushed row behind: it showed up in expense lists and its
+    # amount (with no splits) credited the payer, corrupting balances.
+    split_cents = None
     if split_type == "EXACT":
         if not expense_in.splits:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Custom splits required when split_type is 'EXACT'"
             )
-        
+
         # Validate all split users are group members
         split_total = 0.0
         seen_users = set()
@@ -110,6 +101,22 @@ def create_expense(db: Session, expense_in: ExpenseCreate) -> Expense:
             uid, cents = split_cents[idx]
             split_cents[idx] = (uid, cents + residual)
 
+    # 6. Create Expense record
+    expense = Expense(
+        group_id=expense_in.group_id,
+        paid_by=expense_in.paid_by,
+        amount=round(expense_in.amount, 2),
+        description=expense_in.description.strip(),
+        category=category,
+        split_type=split_type
+    )
+    db.add(expense)
+    db.flush()  # populate expense.id
+
+    # 7. Calculate splits
+    splits_to_create = []
+
+    if split_type == "EXACT":
         for user_id, cents in split_cents:
             splits_to_create.append(
                 ExpenseSplit(

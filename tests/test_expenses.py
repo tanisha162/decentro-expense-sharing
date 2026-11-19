@@ -82,6 +82,50 @@ def test_add_expense_exact_splits_rounding_balances(client):
     bals = client.get(f"/groups/{g_id}/balances").json()
     assert round(sum(bals["net_balances"].values()), 2) == 0.0
 
+def test_add_expense_rejected_exact_splits_store_nothing(client):
+    """A rejected EXACT expense must store nothing. The split validation
+    used to run after the expense was added and flushed, so a 400 for a
+    duplicate user or a non-member in the splits left the expense row
+    behind: it showed up in the expense list and credited the payer
+    ₹100 with no matching shares, so net balances summed to +100."""
+    g_id, u1, u2, u3 = setup_group_with_users(client)
+    outsider = client.post("/users", json={"name": "Outsider"}).json()["id"]
+
+    # Duplicate user in splits
+    res = client.post("/expenses", json={
+        "group_id": g_id,
+        "paid_by": u1,
+        "amount": 100.0,
+        "description": "Dup split",
+        "split_type": "EXACT",
+        "splits": [
+            {"user_id": u1, "amount": 50.0},
+            {"user_id": u1, "amount": 50.0},
+        ],
+    })
+    assert res.status_code == 400
+    assert client.get(f"/groups/{g_id}/expenses").json() == []
+
+    # Non-member in splits
+    res = client.post("/expenses", json={
+        "group_id": g_id,
+        "paid_by": u1,
+        "amount": 100.0,
+        "description": "Outsider split",
+        "split_type": "EXACT",
+        "splits": [
+            {"user_id": u1, "amount": 50.0},
+            {"user_id": outsider, "amount": 50.0},
+        ],
+    })
+    assert res.status_code == 400
+    assert client.get(f"/groups/{g_id}/expenses").json() == []
+
+    # The ledger is untouched: no spending, balances sum to zero.
+    bals = client.get(f"/groups/{g_id}/balances").json()
+    assert bals["total_group_spending"] == 0.0
+    assert bals["net_balances"] == {}
+
 def test_add_expense_equal_with_splits_rejected(client):
     """Custom splits with split_type EQUAL must be rejected, not silently
     discarded while the expense is stored as an equal split (regression:
