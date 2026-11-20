@@ -1,5 +1,6 @@
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple, Any
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.models import Expense, ExpenseSplit, Settlement, User, Group, GroupMember
 from app.schemas import SimplifiedDebt, GroupBalanceDetail
@@ -211,6 +212,15 @@ def calculate_overall_balances(
     }
     """
     if group_id is not None:
+        # A nonexistent group used to return an empty {} with 200, which a
+        # client cannot tell apart from "group exists and nobody owes
+        # anything" — every other group-scoped endpoint 404s instead.
+        group = db.query(Group).filter(Group.id == group_id).first()
+        if not group:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Group with id {group_id} not found"
+            )
         pairwise, _, _, _ = calculate_pairwise_balances_for_group(db, group_id)
         return pairwise
 

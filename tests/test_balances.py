@@ -82,6 +82,15 @@ def test_bidirectional_expense_netting(client):
     assert balances["Ankit"]["owes"]["Mohit"] == 400.0
     assert balances["Ankit"]["owes"]["Rahul"] == 200.0
 
+def test_balances_for_unknown_group_returns_404(client):
+    """
+    GET /balances?group_id=<nonexistent> used to return 200 with {},
+    indistinguishable from "group exists and nobody owes anything" —
+    every other group-scoped endpoint 404s on an unknown group.
+    """
+    res = client.get("/balances?group_id=9999")
+    assert res.status_code == 404
+
 def test_duplicate_names_balances_aggregate(client):
     """
     Two members may share a display name. Balances are keyed by name, so

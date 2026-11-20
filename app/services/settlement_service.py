@@ -74,6 +74,15 @@ def record_settlement(db: Session, settlement_in: SettlementCreate) -> Settlemen
     return settlement
 
 def list_group_settlements(db: Session, group_id: int) -> List[Settlement]:
+    # A nonexistent group used to return an empty list with 200, which a
+    # client cannot tell apart from "group exists and has no settlements" —
+    # every other group-scoped endpoint 404s instead.
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if not group:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Group with id {group_id} not found"
+        )
     return (
         db.query(Settlement)
         .filter(Settlement.group_id == group_id)

@@ -50,6 +50,15 @@ def test_balance_settlement_bonus_spec(client):
     # Ankit still owes Mohit 400
     assert updated_balances["Ankit"]["owes"]["Mohit"] == 400.0
 
+def test_settlements_for_unknown_group_returns_404(client):
+    """
+    GET /groups/<nonexistent>/settlements used to return 200 with [],
+    indistinguishable from "group exists and has no settlements" —
+    every other group-scoped endpoint 404s on an unknown group.
+    """
+    res = client.get("/groups/9999/settlements")
+    assert res.status_code == 404
+
 def test_settlement_validations(client):
     g_id, u1, u2, _ = setup_benchmark_group(client)
 
