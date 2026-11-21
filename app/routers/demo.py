@@ -50,49 +50,35 @@ def seed_demo_data(db: Session = Depends(get_db)):
             db.add(gm)
     db.commit()
 
-    # 4. Add the PDF benchmark expense: Dinner = ₹1200 paid by Mohit
-    existing_dinner = db.query(Expense).filter(
-        Expense.group_id == group.id,
-        Expense.description == "Dinner"
-    ).first()
-
-    if not existing_dinner:
-        expense_service.create_expense(
-            db,
-            ExpenseCreate(
-                group_id=group.id,
-                paid_by=user_objs["Mohit"].id,
-                amount=1200.0,
-                description="Dinner",
-                category="Food",
-                split_type="EQUAL"
+    # 4. Add the PDF benchmark expense: Dinner = ₹1200 paid by Mohit,
+    # plus two more expenses to showcase analytics and debt simplification.
+    # Each seed expense is checked by its own description: the old code
+    # gated all three on the Dinner expense alone, so any user expense
+    # literally named "Dinner" in the Goa Trip group silently skipped
+    # the other two seed expenses and left the demo data incomplete
+    # while still reporting success.
+    seed_expenses = [
+        dict(paid_by=user_objs["Mohit"].id, amount=1200.0,
+             description="Dinner", category="Food"),
+        dict(paid_by=user_objs["Rahul"].id, amount=600.0,
+             description="Beach Shack Breakfast", category="Food"),
+        dict(paid_by=user_objs["Ankit"].id, amount=900.0,
+             description="Airport Taxi", category="Transport"),
+    ]
+    for seed_expense in seed_expenses:
+        existing = db.query(Expense).filter(
+            Expense.group_id == group.id,
+            Expense.description == seed_expense["description"]
+        ).first()
+        if not existing:
+            expense_service.create_expense(
+                db,
+                ExpenseCreate(
+                    group_id=group.id,
+                    split_type="EQUAL",
+                    **seed_expense
+                )
             )
-        )
-
-        # Add a couple more expenses to showcase analytics and debt simplification
-        expense_service.create_expense(
-            db,
-            ExpenseCreate(
-                group_id=group.id,
-                paid_by=user_objs["Rahul"].id,
-                amount=600.0,
-                description="Beach Shack Breakfast",
-                category="Food",
-                split_type="EQUAL"
-            )
-        )
-
-        expense_service.create_expense(
-            db,
-            ExpenseCreate(
-                group_id=group.id,
-                paid_by=user_objs["Ankit"].id,
-                amount=900.0,
-                description="Airport Taxi",
-                category="Transport",
-                split_type="EQUAL"
-            )
-        )
 
     return {
         "status": "success",
