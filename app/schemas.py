@@ -90,11 +90,16 @@ class ExpenseCreate(BaseModel):
         # "Food" and ?category=Food never matched it; a whitespace-only
         # category became its own bucket instead of "General". Strip it
         # here, like name and description, so one logical category is
-        # always stored one way.
+        # always stored one way. Case differs the same way: "food" and
+        # "FOOD" were also stored verbatim and landed in separate
+        # analytics buckets from "Food", so title-case it too — matching
+        # the existing "Food"/"Transport"/"General" convention.
         if v is None:
             return "General"
         clean = v.strip()
-        return clean or "General"
+        if not clean:
+            return "General"
+        return clean.title()
 
     @field_validator("split_type")
     @classmethod

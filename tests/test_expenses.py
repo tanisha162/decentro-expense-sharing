@@ -291,3 +291,24 @@ def test_expense_category_is_stripped_and_blank_becomes_general(client):
 
     res_food = client.get(f"/groups/{g_id}/expenses?category=Food")
     assert len(res_food.json()) == 2
+
+def test_expense_category_case_is_normalized(client):
+    """Categories differing only in case ("food", "FOOD", "Food") used to
+    be stored verbatim, so analytics split one logical category into
+    three separate buckets instead of one."""
+    g_id, u1, u2, u3 = setup_group_with_users(client)
+
+    for cat in ("food", "FOOD", "Food"):
+        res = client.post("/expenses", json={
+            "group_id": g_id, "paid_by": u1, "amount": 100.0,
+            "description": f"Meal {cat}", "category": cat
+        })
+        assert res.status_code == 201
+        assert res.json()["category"] == "Food"
+
+    # One bucket for Food totalling all three expenses
+    an = client.get(f"/groups/{g_id}/analytics").json()
+    food_buckets = [c for c in an["categories"] if c["category"] == "Food"]
+    assert len(food_buckets) == 1
+    assert food_buckets[0]["total_amount"] == 300.0
+    assert food_buckets[0]["count"] == 3
