@@ -82,6 +82,20 @@ class ExpenseCreate(BaseModel):
             raise ValueError("Expense description cannot be empty")
         return clean
 
+    @field_validator("category")
+    @classmethod
+    def category_must_be_normalized(cls, v: Optional[str]) -> str:
+        # A category with surrounding whitespace (" Food ") was stored
+        # verbatim, so analytics split it into a separate bucket from
+        # "Food" and ?category=Food never matched it; a whitespace-only
+        # category became its own bucket instead of "General". Strip it
+        # here, like name and description, so one logical category is
+        # always stored one way.
+        if v is None:
+            return "General"
+        clean = v.strip()
+        return clean or "General"
+
     @field_validator("split_type")
     @classmethod
     def split_type_must_be_known(cls, v: Optional[str]) -> str:

@@ -254,3 +254,40 @@ def test_list_group_expenses_and_filters(client):
     res_search = client.get(f"/groups/{g_id}/expenses?search=taxi")
     assert len(res_search.json()) == 1
     assert res_search.json()[0]["description"] == "Taxi ride"
+
+def test_expense_category_is_stripped_and_blank_becomes_general(client):
+    """A category with surrounding whitespace used to be stored verbatim,
+    so " Food " and "Food" landed in separate analytics buckets and the
+    ?category=Food filter missed the padded expense; a whitespace-only
+    category became its own bucket instead of "General"."""
+    g_id, u1, u2, u3 = setup_group_with_users(client)
+
+    res = client.post("/expenses", json={
+        "group_id": g_id, "paid_by": u1, "amount": 100.0,
+        "description": "Lunch", "category": " Food "
+    })
+    assert res.status_code == 201
+    assert res.json()["category"] == "Food"
+
+    res = client.post("/expenses", json={
+        "group_id": g_id, "paid_by": u1, "amount": 50.0,
+        "description": "Snacks", "category": "Food"
+    })
+    assert res.status_code == 201
+
+    res = client.post("/expenses", json={
+        "group_id": g_id, "paid_by": u1, "amount": 10.0,
+        "description": "Misc", "category": "   "
+    })
+    assert res.status_code == 201
+    assert res.json()["category"] == "General"
+
+    # One bucket for Food, found by the category filter
+    an = client.get(f"/groups/{g_id}/analytics").json()
+    food_buckets = [c for c in an["categories"] if c["category"] == "Food"]
+    assert len(food_buckets) == 1
+    assert food_buckets[0]["total_amount"] == 150.0
+    assert food_buckets[0]["count"] == 2
+
+    res_food = client.get(f"/groups/{g_id}/expenses?category=Food")
+    assert len(res_food.json()) == 2
