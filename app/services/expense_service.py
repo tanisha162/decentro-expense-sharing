@@ -1,5 +1,6 @@
 from typing import List, Optional
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from app.models import Expense, ExpenseSplit, Group, User, GroupMember
 from app.schemas import ExpenseCreate, ExpenseResponse, ExpenseSplitDetail
@@ -151,6 +152,31 @@ def create_expense(db: Session, expense_in: ExpenseCreate) -> Expense:
     return expense
 
 
+def _escape_like(term: str) -> str:
+    # A user-supplied filter value is data, not a LIKE pattern: escape the
+    # LIKE wildcards so "%" matches a literal percent sign, not everything.
+    return term.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def apply_expense_filters(query, category: Optional[str] = None, search: Optional[str] = None):
+    """Shared category/search filtering for expense listings.
+
+    Category is an exact case-insensitive match on the stripped value:
+    categories are normalized on write, and the old
+    ``Expense.category.ilike(category)`` treated % and _ in the value as
+    LIKE wildcards, so ?category=% returned every expense instead of none.
+    Search is a substring match with wildcards in the term escaped.
+    """
+    if category and category.strip() and category.strip().lower() != "all":
+        query = query.filter(func.lower(Expense.category) == category.strip().lower())
+
+    if search and search.strip():
+        term = f"%{_escape_like(search.strip())}%"
+        query = query.filter(Expense.description.ilike(term, escape="\\"))
+
+    return query
+
+
 def list_group_expenses(
     db: Session,
     group_id: int,
@@ -166,13 +192,7 @@ def list_group_expenses(
         )
 
     query = db.query(Expense).filter(Expense.group_id == group_id)
-
-    if category and category.lower() != "all":
-        query = query.filter(Expense.category.ilike(category))
-
-    if search and search.strip():
-        term = f"%{search.strip()}%"
-        query = query.filter(Expense.description.ilike(term))
+    query = apply_expense_filters(query, category, search)
 
     return query.order_by(Expense.created_at.desc(), Expense.id.desc()).all()
 

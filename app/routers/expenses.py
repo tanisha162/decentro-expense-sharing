@@ -58,10 +58,7 @@ def list_expenses_query(
         # All expenses
         from app.models import Expense
         query = db.query(Expense)
-        if category and category.lower() != "all":
-            query = query.filter(Expense.category.ilike(category))
-        if search and search.strip():
-            query = query.filter(Expense.description.ilike(f"%{search.strip()}%"))
+        query = expense_service.apply_expense_filters(query, category, search)
         expenses = query.order_by(Expense.created_at.desc(), Expense.id.desc()).all()
 
     return [expense_service.format_expense_response(e) for e in expenses]

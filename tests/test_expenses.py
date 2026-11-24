@@ -312,3 +312,42 @@ def test_expense_category_case_is_normalized(client):
     assert len(food_buckets) == 1
     assert food_buckets[0]["total_amount"] == 300.0
     assert food_buckets[0]["count"] == 3
+
+def test_expense_filters_treat_wildcards_as_literal_text(client):
+    """The category/search filters passed the raw value into ilike() as a
+    LIKE pattern, so ?category=% matched every expense (and ?search=%
+    likewise) instead of matching nothing — a filter that returns
+    everything is no filter at all."""
+    g_id, u1, u2, u3 = setup_group_with_users(client)
+
+    client.post("/expenses", json={
+        "group_id": g_id, "paid_by": u1, "amount": 100.0,
+        "description": "Lunch", "category": "Food"
+    })
+    client.post("/expenses", json={
+        "group_id": g_id, "paid_by": u1, "amount": 50.0,
+        "description": "Cab", "category": "Transport"
+    })
+
+    # A "%" category matches no stored category, so it must return none
+    res = client.get(f"/groups/{g_id}/expenses", params={"category": "%"})
+    assert res.status_code == 200
+    assert res.json() == []
+
+    # Same on the unscoped /expenses listing
+    res = client.get("/expenses", params={"category": "%"})
+    assert res.status_code == 200
+    assert res.json() == []
+
+    # A "%" search term matches no description literally, so it returns none
+    res = client.get(f"/groups/{g_id}/expenses", params={"search": "%"})
+    assert res.status_code == 200
+    assert res.json() == []
+
+    # Normal filtering still works, including a padded category value
+    res = client.get(f"/groups/{g_id}/expenses", params={"category": " Food "})
+    assert len(res.json()) == 1
+    assert res.json()[0]["description"] == "Lunch"
+    res = client.get(f"/groups/{g_id}/expenses", params={"search": "cab"})
+    assert len(res.json()) == 1
+    assert res.json()[0]["description"] == "Cab"
