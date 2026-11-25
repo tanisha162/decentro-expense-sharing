@@ -79,3 +79,15 @@ def test_settlement_validations(client):
         "amount": -50.0
     })
     assert res_neg.status_code == 422
+
+    # Sub-cent amount validation: round(amount, 2) stored 0.00, tripping
+    # the DB "amount > 0" check and crashing with an unhandled
+    # IntegrityError (500) instead of a clean validation error.
+    res_tiny = client.post("/settlements", json={
+        "group_id": g_id,
+        "payer_id": u1,
+        "payee_id": u2,
+        "amount": 0.001
+    })
+    assert res_tiny.status_code == 422
+    assert client.get(f"/groups/{g_id}/settlements").json() == []

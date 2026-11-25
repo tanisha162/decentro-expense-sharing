@@ -165,6 +165,32 @@ def test_add_expense_validation_amount_negative(client):
     })
     assert res.status_code == 422
 
+def test_add_expense_subcent_amount_rejected(client):
+    """A sub-cent amount (e.g. 0.001) passed the gt=0 check but
+    round(amount, 2) stored 0.00, tripping the DB "amount > 0" check and
+    crashing the request with an unhandled IntegrityError (500) instead
+    of a clean validation error. 0.005 is rejected too: it stored 0.01
+    while its splits summed to 0.00, unbalancing the ledger by a cent."""
+    g_id, u1, _, _ = setup_group_with_users(client)
+    for amount in (0.001, 0.004, 0.005):
+        res = client.post("/expenses", json={
+            "group_id": g_id,
+            "paid_by": u1,
+            "amount": amount,
+            "description": "Tiny expense"
+        })
+        assert res.status_code == 422
+    # Nothing was stored for the rejected expenses
+    assert client.get(f"/groups/{g_id}/expenses").json() == []
+    # One cent is the smallest valid expense
+    res = client.post("/expenses", json={
+        "group_id": g_id,
+        "paid_by": u1,
+        "amount": 0.01,
+        "description": "One cent"
+    })
+    assert res.status_code == 201
+
 def test_add_expense_invalid_split_type_rejected(client):
     """Unknown split_type must be rejected, not stored while splits are
     silently computed as EQUAL (regression: 'PERCENTAGE' returned 201)."""

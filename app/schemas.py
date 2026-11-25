@@ -74,6 +74,19 @@ class ExpenseCreate(BaseModel):
     split_type: Optional[str] = Field("EQUAL", description="EQUAL or EXACT")
     splits: Optional[List[SplitItem]] = Field(None, description="Custom unequal splits")
 
+    @field_validator("amount")
+    @classmethod
+    def amount_must_be_at_least_one_cent(cls, v: float) -> float:
+        # Amounts are stored rounded to whole cents: a sub-cent amount
+        # (e.g. 0.001) passed the gt=0 check but round(amount, 2) stored
+        # 0.00, tripping the DB "amount > 0" check and crashing the
+        # request with an unhandled IntegrityError (500) instead of a
+        # clean validation error — and 0.005 stored 0.01 while its splits
+        # summed to 0.00, unbalancing the ledger by a cent.
+        if v < 0.01:
+            raise ValueError("Amount must be at least 0.01")
+        return v
+
     @field_validator("description")
     @classmethod
     def desc_must_not_be_blank(cls, v: str) -> str:
@@ -158,6 +171,16 @@ class SettlementCreate(BaseModel):
     payee_id: int
     amount: float = Field(..., gt=0, description="Settlement amount must be > 0")
     notes: Optional[str] = Field(None, max_length=255)
+
+    @field_validator("amount")
+    @classmethod
+    def amount_must_be_at_least_one_cent(cls, v: float) -> float:
+        # Same sub-cent trap as expenses: round(amount, 2) stored 0.00
+        # for amounts under 0.01, tripping the DB "amount > 0" check and
+        # crashing the request with an unhandled IntegrityError (500).
+        if v < 0.01:
+            raise ValueError("Amount must be at least 0.01")
+        return v
 
     @model_validator(mode="after")
     def validate_different_users(self):
