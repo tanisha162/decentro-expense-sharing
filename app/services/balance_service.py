@@ -110,6 +110,14 @@ def calculate_pairwise_balances_for_group(
             u1_name = user_map[u1].name if u1 in user_map else f"User {u1}"
             u2_name = user_map[u2].name if u2 in user_map else f"User {u2}"
 
+            if u1_name == u2_name:
+                # Both users share a display name, so the debt is internal
+                # to the name bucket this response is keyed by: rendering
+                # it would say e.g. "Asha owes Asha", which is meaningless.
+                # The bucket's net balance already reflects the transfer
+                # (one Asha's -x cancels the other's +x), so skip it.
+                continue
+
             if diff > 0.005:
                 # u1 owes u2
                 # Aggregate by display name: several members can share a

@@ -129,3 +129,47 @@ def test_duplicate_names_balances_aggregate(client):
     rahul_debts = [d for d in data["simplified_debts"] if d["from_user_name"] == "Rahul"]
     assert len(rahul_debts) == 2
     assert sum(d["amount"] for d in rahul_debts) == 600.0
+
+def test_duplicate_names_never_owe_themselves(client):
+    """
+    Two members sharing a name who owe *each other* must not render as
+    "Rahul owes Rahul": the response is keyed by display name, so a debt
+    between two Rahuls is internal to the Rahul bucket and its net effect
+    on the bucket is zero. Only debts to a differently-named user show.
+    """
+    g_id = client.post("/groups", json={"name": "Goa Trip"}).json()["id"]
+    r1 = client.post("/users", json={"name": "Rahul"}).json()["id"]
+    r2 = client.post("/users", json={"name": "Rahul"}).json()["id"]
+    mohit = client.post("/users", json={"name": "Mohit"}).json()["id"]
+
+    for uid in [r1, r2, mohit]:
+        client.post(f"/groups/{g_id}/members", json={"user_id": uid})
+
+    # Mohit pays 900: each Rahul owes Mohit 300.
+    client.post("/expenses", json={
+        "group_id": g_id,
+        "paid_by": mohit,
+        "amount": 900.0,
+        "description": "Dinner"
+    })
+    # Second Rahul pays 300: first Rahul now also owes second Rahul 100.
+    client.post("/expenses", json={
+        "group_id": g_id,
+        "paid_by": r2,
+        "amount": 300.0,
+        "description": "Breakfast"
+    })
+
+    res = client.get(f"/groups/{g_id}/balances")
+    assert res.status_code == 200
+    data = res.json()
+
+    # The internal Rahul -> Rahul debt must not appear as a self-debt.
+    assert "Rahul" not in data["balances"]["Rahul"]["owes"]
+    # The real debts survive: Rahul#1 owes Mohit 300, Rahul#2 owes
+    # Mohit 300 - 100 = 200, aggregated under the shared name.
+    assert data["balances"]["Rahul"]["owes"]["Mohit"] == 500.0
+    # Name-keyed books still balance.
+    assert data["net_balances"]["Rahul"] == -500.0
+    assert data["net_balances"]["Mohit"] == 500.0
+    assert round(sum(data["net_balances"].values()), 2) == 0.0
