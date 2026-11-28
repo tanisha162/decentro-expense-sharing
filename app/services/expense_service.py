@@ -49,6 +49,15 @@ def create_expense(db: Session, expense_in: ExpenseCreate) -> Expense:
     category = expense_in.category or "General"
     split_type = expense_in.split_type or "EQUAL"
 
+    # The expense amount and its splits must be cut from the same whole
+    # cents: round(amount, 2) and int(round(amount * 100)) disagree for
+    # 3-decimal amounts (e.g. 100.025 stores as 100.03 but splits from
+    # 10002 cents = 100.02), so the stored expense was a cent more than
+    # its splits and net balances summed to +0.01 instead of zero.
+    # The schema validator already rejects amounts under 0.01, so this
+    # is always at least 1 cent.
+    total_cents = int(round(expense_in.amount * 100))
+
     # The validation used to run after the expense was added and flushed,
     # so a rejected EXACT expense (duplicate user, non-member, bad sum)
     # left a flushed row behind: it showed up in expense lists and its
@@ -95,7 +104,6 @@ def create_expense(db: Session, expense_in: ExpenseCreate) -> Expense:
         # 99.99 for a 100.00 expense), so the ledger no longer balanced:
         # net balances summed to +0.01. Push the residual onto the largest
         # split so the stored splits sum exactly to the expense amount.
-        total_cents = int(round(expense_in.amount * 100))
         residual = total_cents - sum(c for _, c in split_cents)
         if residual:
             idx = max(range(len(split_cents)), key=lambda i: split_cents[i][1])
@@ -106,7 +114,7 @@ def create_expense(db: Session, expense_in: ExpenseCreate) -> Expense:
     expense = Expense(
         group_id=expense_in.group_id,
         paid_by=expense_in.paid_by,
-        amount=round(expense_in.amount, 2),
+        amount=total_cents / 100.0,
         description=expense_in.description.strip(),
         category=category,
         split_type=split_type
@@ -129,7 +137,6 @@ def create_expense(db: Session, expense_in: ExpenseCreate) -> Expense:
     else:
         # EQUAL split among all members of the group
         num_members = len(member_user_ids)
-        total_cents = int(round(expense_in.amount * 100))
         base_cents_each = total_cents // num_members
         remainder_cents = total_cents % num_members
 

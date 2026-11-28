@@ -82,6 +82,28 @@ def test_add_expense_exact_splits_rounding_balances(client):
     bals = client.get(f"/groups/{g_id}/balances").json()
     assert round(sum(bals["net_balances"].values()), 2) == 0.0
 
+def test_add_expense_three_decimal_amount_balances(client):
+    """A 3-decimal amount must store the same cents its splits sum to:
+    round(100.025, 2) is 100.03 but the splits were cut from 10002
+    cents = 100.02, so the stored expense was a cent more than its
+    splits and net balances summed to +0.01 instead of zero."""
+    g_id, u1, u2, u3 = setup_group_with_users(client)
+
+    res = client.post("/expenses", json={
+        "group_id": g_id,
+        "paid_by": u1,
+        "amount": 100.025,
+        "description": "Taxi fare",
+        "split_type": "EQUAL",
+    })
+    assert res.status_code == 201
+    data = res.json()
+    assert round(sum(s["amount"] for s in data["splits"]), 2) == data["amount"]
+
+    # The ledger must balance: net balances sum to zero.
+    bals = client.get(f"/groups/{g_id}/balances").json()
+    assert round(sum(bals["net_balances"].values()), 2) == 0.0
+
 def test_add_expense_rejected_exact_splits_store_nothing(client):
     """A rejected EXACT expense must store nothing. The split validation
     used to run after the expense was added and flushed, so a 400 for a
